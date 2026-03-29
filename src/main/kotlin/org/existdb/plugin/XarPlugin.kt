@@ -8,18 +8,18 @@ import org.gradle.api.tasks.Delete
 import org.gradle.api.tasks.bundling.Zip
 import org.gradle.kotlin.dsl.*
 
-public enum class PackageType(val typeName: String) {
+enum class PackageType(val typeName: String) {
     LIBRARY("library"),
     APPLICATION("application");
 
     override fun toString(): String = typeName
 }
 
-public data class VersionedDependency(val name: String, val version: String, val minVersion: String, val maxVersion: String)
+data class VersionedDependency(val name: String, val version: String, val minVersion: String, val maxVersion: String)
 
-public val exist640orLater = VersionedDependency("exist", "", "6.4.0", "")
-public val exist6only = VersionedDependency("exist", "", "6", "6")
-public val exist7orLater = VersionedDependency("exist", "", "7", "")
+val exist640orLater = VersionedDependency("exist", "", "6.4.0", "")
+val exist6only = VersionedDependency("exist", "", "6", "6")
+val exist7orLater = VersionedDependency("exist", "", "7", "")
 
 open class XarExtension {
     // XAR package metadata
@@ -78,7 +78,7 @@ class XarPlugin : Plugin<Project> {
         }
 
         val createXarResources = project.tasks.register("createXarResources") {
-            group = "prepare"
+            group = "build"
             description = "Creates the folder for XAR resources"
             outputs.dir(buildDirProvider.dir("xar-resources"))
 
@@ -234,7 +234,7 @@ $jarList
         }
 
         project.tasks.register<Zip>("makeXar") {
-            group = "package"
+            group = "build"
             description = "Creates the XAR package for eXist-db"
             dependsOn(createXarResources, copyXarResources, createExpathPackageDescriptor, createRepoXml, createExistXml)
 
