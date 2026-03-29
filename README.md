@@ -1,7 +1,9 @@
 # Gradle XAR Plugin
 
-A Gradle plugin for building expath XAR packages.
-It creates an exist-db specific file, exist.xml, in order to list JARs that are needed at runtime.
+A Gradle plugin for building [EXpath XAR packages](http://expath.org/spec/pkg/20120509) with exist-db specific extensions.
+
+Two files, repo.xml and exist.xml, which are needed to put JARs on the classpath and run package specific preparation and cleanup scripts.
+If you want to learn more about the XAR format extensions, please refer to the [eXist-db EXpath Package Manager documentation](http://exist-db.org/exist/apps/doc/repo#expath-pkg).
 
 ## Usage
 
