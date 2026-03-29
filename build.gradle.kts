@@ -75,6 +75,25 @@ repositories {
 
 dependencies {
     implementation(kotlin("stdlib"))
+
+    testImplementation(gradleTestKit())
+    testImplementation("org.junit.jupiter:junit-jupiter-api:5.11.2")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.11.2")
+}
+
+testing {
+    suites {
+        val test by getting(JvmTestSuite::class) {
+            useJUnitJupiter()
+        }
+    }
+}
+
+tasks.withType<Test>().configureEach {
+    useJUnitPlatform()
+    javaLauncher.set(javaToolchains.launcherFor {
+        languageVersion.set(JavaLanguageVersion.of(17))
+    })
 }
 
 kotlin {
