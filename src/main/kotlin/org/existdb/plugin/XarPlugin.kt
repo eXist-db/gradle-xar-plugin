@@ -3,7 +3,6 @@ package org.existdb.plugin
 import org.gradle.api.GradleException
 import org.gradle.api.Plugin
 import org.gradle.api.Project
-import org.gradle.api.Task
 import org.gradle.api.tasks.Copy
 import org.gradle.api.tasks.Delete
 import org.gradle.api.tasks.bundling.Zip
@@ -59,187 +58,200 @@ class XarPlugin : Plugin<Project> {
     override fun apply(project: Project) {
         val extension = project.extensions.create("xar", XarExtension::class.java)
 
-        project.afterEvaluate {
-            // Validate required properties
-            if (extension.javaClass.isEmpty()) {
-                throw GradleException("XAR plugin requires 'javaClass' to be set in the 'xar' extension")
-            }
-            if (extension.namespace.isEmpty()) {
-                throw GradleException("XAR plugin requires 'namespace' to be set in the 'xar' extension")
-            }
-            if (extension.type == PackageType.APPLICATION && extension.target.isEmpty()) {
-                throw GradleException("XAR plugin: 'target' must be set for application packages")
-            }
-            // Set defaults if not configured
-            extension.version = extension.version.ifEmpty { project.version.toString() }
-            extension.abbrev = extension.abbrev.ifEmpty { project.name }
-            extension.title = extension.title.ifEmpty { project.description ?: project.name }
-            extension.home = extension.home.ifEmpty { project.findProperty("project.url") as? String ?: "" }
+        val buildDirProvider = project.layout.buildDirectory
 
-            val buildDir = layout.buildDirectory.asFile.get()
+        val validateXarExtension = project.tasks.register("validateXarExtension") {
+            group = "verification"
+            description = "Validates the XAR extension configuration"
 
-            // Register tasks after configuration
-            val createXarResources = project.tasks.register("createXarResources") {
-                group = "prepare"
-                description = "Creates the folder for XAR resources"
-                outputs.dir("${buildDir}/xar-resources")
-                doLast {
-                    val xarDir = project.file("${buildDir}/xar-resources")
-                    xarDir.mkdirs()
-                    // The content directory is required for the main JAR created by this build
-                    project.file("${buildDir}/xar-resources/content").mkdirs()
+            doLast {
+                if (extension.javaClass.isEmpty()) {
+                    throw GradleException("XAR plugin requires 'javaClass' to be set in the 'xar' extension")
+                }
+                if (extension.namespace.isEmpty()) {
+                    throw GradleException("XAR plugin requires 'namespace' to be set in the 'xar' extension")
+                }
+                if (extension.type == PackageType.APPLICATION && extension.target.isEmpty()) {
+                    throw GradleException("XAR plugin: 'target' must be set for application packages")
                 }
             }
+        }
 
-            val copyXarResources = project.tasks.register<Copy>("copyXarResources") {
-                group = "build"
-                description = "Copies additional package contents to output directory for XAR packaging"
-                dependsOn(createXarResources)
-                from("src/main/xar-resources")
-                into("${buildDir}/xar-resources")
+        val createXarResources = project.tasks.register("createXarResources") {
+            group = "prepare"
+            description = "Creates the folder for XAR resources"
+            outputs.dir(buildDirProvider.dir("xar-resources"))
+
+            doLast {
+                buildDirProvider.dir("xar-resources").get().asFile.mkdirs()
+                buildDirProvider.dir("xar-resources/content").get().asFile.mkdirs()
             }
+        }
 
-            val cleanXarResources = project.tasks.register<Delete>("cleanXarResources") {
-                group = "build"
-                description = "Cleans the XAR resources directory"
-                delete("${buildDir}/xar-resources")
-            }
+        val copyXarResources = project.tasks.register<Copy>("copyXarResources") {
+            group = "build"
+            description = "Copies additional package contents to output directory for XAR packaging"
+            dependsOn(createXarResources)
+            from("src/main/xar-resources")
+            into(buildDirProvider.dir("xar-resources"))
+        }
 
-            val createExpathPackageDescriptor = project.tasks.register("createExpathPackageDescriptor") {
-                group = "build"
-                description = "Creates the expath-pkg.xml descriptor for the XAR package"
-                outputs.file("${buildDir}/xar-resources/expath-pkg.xml")
-                dependsOn(createXarResources)
+        val cleanXarResources = project.tasks.register<Delete>("cleanXarResources") {
+            group = "build"
+            description = "Cleans the XAR resources directory"
+            delete(buildDirProvider.dir("xar-resources"))
+        }
 
-                val processorDependency = extension.processorDependencies.joinToString("\n") { (name, version, minVersion, maxVersion) ->
+        val createExpathPackageDescriptor = project.tasks.register("createExpathPackageDescriptor") {
+            group = "build"
+            description = "Creates the expath-pkg.xml descriptor for the XAR package"
+            dependsOn(validateXarExtension, createXarResources)
+            outputs.file(buildDirProvider.file("xar-resources/expath-pkg.xml"))
+
+            doLast {
+                val version = extension.version.ifEmpty { project.version.toString() }
+                val abbrev = extension.abbrev.ifEmpty { project.name }
+                val title = extension.title.ifEmpty { project.description ?: project.name }
+                val home = extension.home.ifEmpty { project.findProperty("project.url") as? String ?: "" }
+
+                val processorDependency = extension.processorDependencies.joinToString("\n") { (name, depVersion, minVersion, maxVersion) ->
                     val versionAttributes = listOfNotNull(
-                        version.takeIf { it.isNotEmpty() }?.let { "semver=\"$it\"" },
-                        minVersion.takeIf { it.isNotEmpty() }?.let { "semver-min=\"$it\"" },
-                        maxVersion.takeIf { it.isNotEmpty() }?.let { "semver-max=\"$it\"" }
+                        depVersion.takeIf { it.isNotEmpty() }?.let { """semver="$it"""" },
+                        minVersion.takeIf { it.isNotEmpty() }?.let { """semver-min="$it"""" },
+                        maxVersion.takeIf { it.isNotEmpty() }?.let { """semver-max="$it"""" }
                     ).joinToString(" ")
                     """<dependency processor="$name" $versionAttributes />"""
                 }
 
-                val packageDependencies = extension.packageDependencies.joinToString("\n") { (name, version, minVersion, maxVersion) ->
+                val packageDependencies = extension.packageDependencies.joinToString("\n") { (name, depVersion, minVersion, maxVersion) ->
                     val versionAttributes = listOfNotNull(
-                        version.takeIf { it.isNotEmpty() }?.let { "semver=\"$it\"" },
-                        minVersion.takeIf { it.isNotEmpty() }?.let { "semver-min=\"$it\"" },
-                        maxVersion.takeIf { it.isNotEmpty() }?.let { "semver-max=\"$it\"" }
+                        depVersion.takeIf { it.isNotEmpty() }?.let { """semver="$it"""" },
+                        minVersion.takeIf { it.isNotEmpty() }?.let { """semver-min="$it"""" },
+                        maxVersion.takeIf { it.isNotEmpty() }?.let { """semver-max="$it"""" }
                     ).joinToString(" ")
                     """<dependency package="$name" $versionAttributes />"""
                 }
 
-                doLast {
-                    project.file("${buildDir}/xar-resources/expath-pkg.xml").writeText("""<?xml version="1.0" encoding="UTF-8"?>
+                buildDirProvider.file("xar-resources/expath-pkg.xml").get().asFile.writeText(
+                    """<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://expath.org/ns/pkg"
          xmlns:xs="http://www.w3.org/2001/XMLSchema"
          name="${extension.namespace}"
-         abbrev="${extension.abbrev}"
-         version="${project.version}"
+         abbrev="$abbrev"
+         version="$version"
          spec="1.0">
-   <title>${extension.title}</title>
-   <home>${extension.home}</home>
-   ${processorDependency}
-   ${packageDependencies}
-</package>""")
-                }
+   <title>$title</title>
+   <home>$home</home>
+   $processorDependency
+   $packageDependencies
+</package>"""
+                )
             }
+        }
 
-            val createRepoXml = project.tasks.register("createRepoXml") {
-                setGroup("build")
-                setDescription("Creates the repo.xml descriptor for the XAR package")
-                outputs.file("${buildDir}/xar-resources/repo.xml")
-                dependsOn(createXarResources)
+        val createRepoXml = project.tasks.register("createRepoXml") {
+            group = "build"
+            description = "Creates the repo.xml descriptor for the XAR package"
+            dependsOn(validateXarExtension, createXarResources)
+            outputs.file(buildDirProvider.file("xar-resources/repo.xml"))
+
+            doLast {
+                val home = extension.home.ifEmpty { project.findProperty("project.url") as? String ?: "" }
                 val scripts = listOfNotNull(
                     extension.prepare.takeIf { it.isNotEmpty() }?.let { """<prepare>$it</prepare>""" },
                     extension.finish.takeIf { it.isNotEmpty() }?.let { """<finish>$it</finish>""" },
                     extension.cleanup.takeIf { it.isNotEmpty() }?.let { """<cleanup>$it</cleanup>""" }
                 ).joinToString("\n")
+
                 val target = if (extension.target.isNotEmpty()) {
                     """<target>${extension.target}</target>"""
                 } else ""
 
-                doLast {
-                    project.file("${buildDir}/xar-resources/repo.xml").writeText("""<?xml version="1.0" encoding="UTF-8"?>
+                buildDirProvider.file("xar-resources/repo.xml").get().asFile.writeText(
+                    """<?xml version="1.0" encoding="UTF-8"?>
 <meta xmlns="http://exist-db.org/xquery/repo"
       xmlns:repo="http://exist-db.org/xquery/repo"
       xmlns:xs="http://www.w3.org/2001/XMLSchema">
    <description>${extension.description}</description>
    <author>${extension.author}</author>
    <type>${extension.type}</type>
-   ${target}
-   <website>${extension.home}</website>
+   $target
+   <website>$home</website>
    <status>${extension.status}</status>
    <license>${extension.license}</license>
    <copyright>true</copyright>
-   ${scripts}
-</meta>""")
-                }
+   $scripts
+</meta>"""
+                )
             }
+        }
 
-            val createExistXml = project.tasks.register("createExistXml") {
-                dependsOn(createXarResources)
-                dependsOn("jar")
-                group = "build"
-                outputs.file("${buildDir}/xar-resources/exist.xml")
-                outputs.dir("${buildDir}/xar-resources/content")
+        val createExistXml = project.tasks.register("createExistXml") {
+            group = "build"
+            description = "Creates exist.xml and copies required jars"
+            dependsOn(validateXarExtension, createXarResources, "jar")
+            outputs.file(buildDirProvider.file("xar-resources/exist.xml"))
+            outputs.dir(buildDirProvider.dir("xar-resources/content"))
 
-                doLast {
-                    val projectJarName = "${project.name}-${project.version}.jar"
-                    val allRequiredJars = (extension.requiredJars + projectJarName).distinct()
+            doLast {
+                val projectJarName = "${project.name}-${project.version}.jar"
+                val allRequiredJars = (extension.requiredJars + projectJarName).distinct()
 
-                    val jarList = allRequiredJars.joinToString("\n") { "   <jar>$it</jar>" }
+                val jarList = allRequiredJars.joinToString("\n") { "   <jar>$it</jar>" }
 
-                    val javaSection = if (extension.export) {
-                        """   <java>
+                val javaSection = if (extension.export) {
+                    """   <java>
       <namespace>${extension.namespace}</namespace>
       <class>${extension.javaClass}</class>
    </java>"""
-                    } else ""
+                } else ""
 
-                    project.file("${buildDir}/xar-resources/exist.xml").writeText("""<?xml version="1.0" encoding="UTF-8"?>
+                buildDirProvider.file("xar-resources/exist.xml").get().asFile.writeText(
+                    """<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://exist-db.org/ns/expath-pkg"
          xmlns:xs="http://www.w3.org/2001/XMLSchema">
 $javaSection
 $jarList
-</package>""")
+</package>"""
+                )
 
-                    val compiledJar = project.tasks.named("jar").get().outputs.files.singleFile
-                    val runtimeAndProjectJars = project.configurations.named("runtimeClasspath").get().files + compiledJar
-                    val selectedJarFiles = allRequiredJars.mapNotNull { name -> runtimeAndProjectJars.find { it.name == name } }
+                val compiledJar = project.tasks.named("jar").get().outputs.files.singleFile
+                val runtimeAndProjectJars = project.configurations.named("runtimeClasspath").get().files + compiledJar
+                val selectedJarFiles = allRequiredJars.mapNotNull { name -> runtimeAndProjectJars.find { it.name == name } }
 
-                    if (selectedJarFiles.size != allRequiredJars.size) {
-                        val missing = allRequiredJars - selectedJarFiles.map { it.name }
-                        throw GradleException("Missing required JAR(s) for XAR: $missing")
-                    }
+                if (selectedJarFiles.size != allRequiredJars.size) {
+                    val missing = allRequiredJars - selectedJarFiles.map { it.name }
+                    throw GradleException("Missing required JAR(s) for XAR: $missing")
+                }
 
-                    selectedJarFiles.forEach { jarFile ->
-                        project.copy {
-                            from(jarFile)
-                            into("${buildDir}/xar-resources/content")
-                        }
+                selectedJarFiles.forEach { jarFile ->
+                    project.copy {
+                        from(jarFile)
+                        into(buildDirProvider.dir("xar-resources/content"))
                     }
                 }
             }
+        }
 
-            project.tasks.register<Zip>("makeXar") {
-                dependsOn(createXarResources)
-                dependsOn(copyXarResources)
-                dependsOn(createExpathPackageDescriptor)
-                dependsOn(createRepoXml)
-                dependsOn(createExistXml)
-                group = "package"
-                description = "Creates the XAR package for eXist-db"
+        project.tasks.register<Zip>("makeXar") {
+            group = "package"
+            description = "Creates the XAR package for eXist-db"
+            dependsOn(createXarResources, copyXarResources, createExpathPackageDescriptor, createRepoXml, createExistXml)
 
-                from("${buildDir}/xar-resources") {
-                    include("**/*")
-                }
-
-                archiveFileName.set("${project.name}-${project.version}.xar")
-                destinationDirectory.set(project.file("${buildDir}/libs"))
+            from(buildDirProvider.dir("xar-resources")) {
+                include("**/*")
             }
 
-            project.tasks.named("build").configure { dependsOn("makeXar") }
+            archiveFileName.set("${project.name}-${project.version}.xar")
+            destinationDirectory.set(buildDirProvider.dir("libs"))
+        }
+
+        project.tasks.named("build").configure {
+            dependsOn("makeXar")
+        }
+
+        project.tasks.named("clean").configure {
+            dependsOn(cleanXarResources)
         }
     }
 }

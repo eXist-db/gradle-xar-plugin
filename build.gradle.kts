@@ -1,5 +1,11 @@
+// IMPORTANT: You must explicitly import the extension function in Kotlin DSL
+import org.gradle.plugin.compatibility.compatibility
+
+//    id("org.gradle.plugin-compatibility") version "1.0.0" // or id("com.gradle.plugin-publish") version "2.1.0"
+
 plugins {
     `java-gradle-plugin`
+    id("org.gradle.plugin-compatibility") version "1.0.0"
     `kotlin-dsl`
     `maven-publish`
     signing
@@ -9,6 +15,8 @@ group = "org.exist-db"
 version = "1.0.0"
 val title = "EXpath XAR Plugin"
 val desc = "Plugin for building expath XAR packages for eXist-db"
+
+val javaVersion = 17
 
 java {
     withSourcesJar()
@@ -22,6 +30,11 @@ gradlePlugin {
             implementationClass = "org.existdb.plugin.XarPlugin"
             displayName = title
             description = desc
+            compatibility {
+                features {
+                    configurationCache = true
+                }
+            }
         }
     }
 }
@@ -91,11 +104,8 @@ testing {
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
-    javaLauncher.set(javaToolchains.launcherFor {
-        languageVersion.set(JavaLanguageVersion.of(17))
-    })
 }
 
 kotlin {
-    jvmToolchain(8)
+    jvmToolchain(javaVersion)
 }
