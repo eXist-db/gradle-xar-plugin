@@ -59,7 +59,7 @@ abstract class CreateExpathPackageDescriptorTask : DefaultTask() {
             """<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://expath.org/ns/pkg"
          xmlns:xs="http://www.w3.org/2001/XMLSchema"
-         name="${namespace}"
+         name="${namespace.get()}"
          abbrev="${abbrev.get()}"
          version="${version.get()}"
          spec="1.0">
@@ -150,7 +150,8 @@ abstract class CreateExistXmlTask : DefaultTask() {
 
     @TaskAction
     fun generate() {
-        val allRequiredJars = requiredJars.get().toSet()
+        // the project's own jar is always needed at runtime
+        val allRequiredJars = (projectJar.files.map { it.name } + requiredJars.get()).toSet()
 
         val jarFiles = (runtimeClasspath.files + projectJar.files).toList()
         val selectedJarFiles = allRequiredJars.mapNotNull { name ->

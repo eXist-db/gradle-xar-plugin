@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
+import java.util.zip.ZipFile
 
 internal class XarPluginTest {
 
@@ -121,5 +122,46 @@ internal class XarPluginTest {
             .buildAndFail()
 
         assertTrue(result.output.contains("XAR plugin: 'target' must be set for application packages"))
+    }
+
+    @Test
+    fun `xar contains project jar and complete descriptors`(@TempDir projectDir: File) {
+        setupProject(projectDir, """
+            import org.existdb.plugin.PackageType.LIBRARY
+            import org.existdb.plugin.exist6only
+
+            plugins {
+                `java`
+                id("org.exist-db.plugin.xar")
+            }
+            group = "org.example"
+            version = "1.2.3"
+
+            xar {
+                namespace = "//example.org/ns/test"
+                javaClass = "org.example.Main"
+                type = LIBRARY
+                processorDependencies = listOf( exist6only )
+            }
+        """)
+
+        GradleRunner.create()
+            .withProjectDir(projectDir)
+            .withPluginClasspath()
+            .withArguments("build", "--stacktrace")
+            .build()
+
+        ZipFile(File(projectDir, "build/libs/xar-integration-test-1.2.3.xar")).use { xar ->
+            assertNotNull(xar.getEntry("content/xar-integration-test-1.2.3.jar"), "project jar should be packaged")
+
+            val existXml = xar.getInputStream(xar.getEntry("exist.xml")).reader().readText()
+            assertTrue(existXml.contains("<jar>xar-integration-test-1.2.3.jar</jar>"), existXml)
+
+            val expathPkg = xar.getInputStream(xar.getEntry("expath-pkg.xml")).reader().readText()
+            assertTrue(expathPkg.contains("""name="//example.org/ns/test""""), expathPkg)
+            assertTrue(expathPkg.contains("""abbrev="xar-integration-test""""), expathPkg)
+            assertTrue(expathPkg.contains("""version="1.2.3""""), expathPkg)
+            assertTrue(expathPkg.contains("""processor="http://exist-db.org""""), expathPkg)
+        }
     }
 }

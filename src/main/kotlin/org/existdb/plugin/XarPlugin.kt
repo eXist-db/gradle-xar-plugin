@@ -21,9 +21,11 @@ enum class PackageType(val typeName: String) {
 
 data class VersionedDependency(val name: String, val version: String, val minVersion: String, val maxVersion: String)
 
-val exist640orLater = VersionedDependency("exist", "", "6.4.0", "")
-val exist6only = VersionedDependency("exist", "", "6", "6")
-val exist7orLater = VersionedDependency("exist", "", "7", "")
+const val existProcessor = "http://exist-db.org"
+
+val exist640orLater = VersionedDependency(existProcessor, "", "6.4.0", "")
+val exist6only = VersionedDependency(existProcessor, "", "6", "6")
+val exist7orLater = VersionedDependency(existProcessor, "", "7", "")
 
 open class XarExtension {
     // XAR package metadata
@@ -106,10 +108,10 @@ class XarPlugin : Plugin<Project> {
             javaClass = extension.javaClass
             namespace = extension.namespace
             target = extension.target
-            version = extension.version
-            title = extension.title
+            version = extension.version.ifEmpty { project.version.toString() }
+            title = extension.title.ifEmpty { project.description ?: project.name }
             home = extension.home
-            abbrev = extension.abbrev
+            abbrev = extension.abbrev.ifEmpty { project.name }
 
             processorDependencies = extension.processorDependencies
                 .map { renderDependency(it, "processor") }
