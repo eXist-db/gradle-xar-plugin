@@ -2,11 +2,8 @@
 import org.gradle.plugin.compatibility.compatibility
 
 plugins {
-    `java-gradle-plugin`
-    id("org.gradle.plugin-compatibility") version "1.0.0"
+    id("com.gradle.plugin-publish") version "2.1.1"
     `kotlin-dsl`
-    `maven-publish`
-    signing
 }
 
 group = "org.exist-db"
@@ -20,61 +17,21 @@ java {
 }
 
 gradlePlugin {
+    website = "https://github.com/eXist-db/gradle-xar-plugin"
+    vcsUrl = "https://github.com/eXist-db/gradle-xar-plugin.git"
     plugins {
         create("xar") {
             id = "org.exist-db.plugin.xar"
             implementationClass = "org.existdb.plugin.XarPlugin"
             displayName = title
             description = desc
+            tags = listOf("exist-db", "xar", "expath")
             compatibility {
                 features {
                     configurationCache = true
                 }
             }
         }
-    }
-}
-
-publishing {
-    publications {
-        create<MavenPublication>("mavenJava") {
-            artifactId = "plugin.xar.gradle"
-            from(components["java"])
-            pom {
-                name = title
-                description = desc
-                url = "http://github.com/exist-db/gradle-xar-plugin"
-                licenses {
-                    license {
-                        name = "The Apache License, Version 2.0"
-                        url = "http://www.apache.org/licenses/LICENSE-2.0.txt"
-                    }
-                }
-                developers {
-                    developer {
-                        id = "line-o"
-                        name = "Juri Leino"
-                        email = "github@line-o.de"
-                    }
-                }
-                scm {
-                    connection = "scm:git:git://github.com/exist-db/gradle-xar-plugin.git"
-                    developerConnection = "scm:git:ssh://github.com/exist-db/gradle-xar-plugin.git"
-                    url = "http://github.com/exist-db/gradle-xar-plugin/"
-                }
-            }
-        }
-    }
-}
-
-signing {
-    // useGpgCmd() does not work
-    sign(publishing.publications["mavenJava"])
-}
-
-tasks.javadoc {
-    if (JavaVersion.current().isJava9Compatible) {
-        (options as StandardJavadocDocletOptions).addBooleanOption("html5", true)
     }
 }
 

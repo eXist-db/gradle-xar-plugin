@@ -10,13 +10,13 @@ If you want to learn more about the XAR format extensions, please refer to the [
 Apply the plugin to your `build.gradle.kts`:
 
 ```kotlin
-plugins {
-    id("org.exist-db.plugin") version "1.0.0"
-}
+import org.existdb.plugin.PackageType
+import org.existdb.plugin.VersionedDependency
+import org.existdb.plugin.exist6only
 
-import org.exist-db.plugin.XarExtension
-import org.exist-db.plugin.PackageType
-import org.exist-db.plugin.exist6only
+plugins {
+    id("org.exist-db.plugin.xar") version "1.0.0"
+}
 ```
 
 Configure the XAR properties:
@@ -27,7 +27,7 @@ xar {
     javaClass = "com.myorg.myapp.MyModule"
     abbrev = "myapp"
     title = "My Application"
-    type = Package.APPLICATION
+    type = PackageType.APPLICATION
     target = "myapp"
     home = "https://github.com/myorg/myapp"
     requiredJars = listOf(
@@ -57,7 +57,7 @@ Finally `makeXar` zips the XAR archive `build/libs/myapp-<version>.xar`.
 You may have noticed these two lines in the usage.
 
 ```kotlin
-import org.exist-db.plugin.exist6only
+import org.existdb.plugin.exist6only
 ```
 
 and later
@@ -101,7 +101,7 @@ Following tasks are available when the plugin is used
 - `abbrev`: Package abbreviation (default: project name)
 - `title`: Package title (default: project description or name)
 - `version`: Package version (default: project version)
-- `type`: Package.LIBRARY or Package.APPLICATION
+- `type`: PackageType.LIBRARY or PackageType.APPLICATION
 - `home`: Home URL (default: empty)
 - `status`: Package status (default: empty)
 - `license`: Package license (default: empty)
@@ -121,3 +121,15 @@ Publish to local .m2
 ```
 
 That's it, now your projects will use your local development version of the plugin.
+
+## Publishing
+
+The plugin is published to the [Gradle Plugin Portal](https://plugins.gradle.org/plugin/org.exist-db.plugin.xar).
+Bump `version` in `build.gradle.kts`, then validate and publish with
+
+```sh
+./gradlew publishPlugins --validate-only
+./gradlew publishPlugins
+```
+
+This requires `gradle.publish.key` and `gradle.publish.secret` to be set, e.g. in `~/.gradle/gradle.properties`.
