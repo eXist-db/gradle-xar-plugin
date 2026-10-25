@@ -17,7 +17,9 @@ import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
+import org.gradle.work.DisableCachingByDefault
 
+@DisableCachingByDefault(because = "Has no outputs")
 abstract class ValidateXarExtensionTask : DefaultTask() {
     @get:Input abstract val javaClass: Property<String>
     @get:Input abstract val namespace: Property<String>
@@ -38,6 +40,7 @@ abstract class ValidateXarExtensionTask : DefaultTask() {
     }
 }
 
+@DisableCachingByDefault(because = "Writing the descriptor is cheaper than caching it")
 abstract class CreateExpathPackageDescriptorTask : DefaultTask() {
     @get:Input abstract val javaClass: Property<String>
     @get:Input abstract val namespace: Property<String>
@@ -81,6 +84,7 @@ abstract class CreateExpathPackageDescriptorTask : DefaultTask() {
     }
 }
 
+@DisableCachingByDefault(because = "Writing the descriptor is cheaper than caching it")
 abstract class CreateRepoXmlTask : DefaultTask() {
     @get:Input abstract val home: Property<String>
     @get:Input abstract val prepare: Property<String>
@@ -128,6 +132,7 @@ abstract class CreateRepoXmlTask : DefaultTask() {
     }
 }
 
+@DisableCachingByDefault(because = "Copies the jars, restoring them from the cache is not faster")
 abstract class CreateExistXmlTask : DefaultTask() {
     @get:Input abstract val javaClass: Property<String>
     @get:Input abstract val namespace: Property<String>
